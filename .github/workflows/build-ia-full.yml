@@ -1,0 +1,43 @@
+name: Build IA Study Full HTML
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ia-study/gz/**'
+      - '.github/workflows/build-ia-full.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Rebuild full HTML
+        shell: python
+        run: |
+          import base64, gzip, pathlib
+          root = pathlib.Path('ia-study')
+          parts = []
+          for i in range(6):
+              parts.append((root / 'gz' / f'{i}.txt').read_text(encoding='utf-8').strip())
+          payload = ''.join(parts)
+          html = gzip.decompress(base64.b64decode(payload)).decode('utf-8')
+          assert html.startswith('<!DOCTYPE html>')
+          assert 'const DATA=' in html
+          assert '快問快答' in html
+          assert html.rstrip().endswith('</html>')
+          (root / 'full.html').write_text(html, encoding='utf-8')
+          print('full.html bytes:', len(html.encode('utf-8')))
+      - name: Commit rebuilt HTML
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ia-study/full.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Rebuild IA study full HTML"
+          git push
